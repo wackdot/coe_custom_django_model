@@ -4,53 +4,72 @@ from django.contrib.auth.models import (
 )
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, is_active=True, is_staff=False, is_admin=False):
+    def create_user(self, email, full_name=None, password=None, is_active=True, is_staff=False, is_admin=False):
+        """
+        Creates and saves a User with the given email and password.
+        """
         if not email:
             raise ValueError("Users must have an email address")
         if not password:
             raise ValueError("Users must have a password")
+        if not full_name:
+            raise ValueError("Users must have a full name")
 
-        user_obj = self.model(
-            email = self.normalize_email(email)
+        user = self.model(
+            email = self.normalize_email(email),
+            full_name = full_name
         )
-        user_obj.set_password(password) # change user password
-        user_obj.staff = is_staff
-        user_obj.admin = is_admin
-        user_obj.active = is_active
-        user_obj.save(using=self._db)
-        return user_obj
-
-    def create_staffuser(self, email, password=None):
-        user = self.create_user(
-            email,
-            password=password,
-            is_staff=True
-        ) 
+        user.set_password(password) # change user password
+        user.staff = is_staff
+        user.admin = is_admin
+        user.active = is_active
+        user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None):
+    def create_staffuser(self, email, full_name=None, password=None):
+        """
+        Creates and saves a staff user with the given email and password.
+        """
         user = self.create_user(
             email,
-            password=password,
-            is_staff=True,
-            is_admin=True,
+            full_name = full_name,
+            password = password
         ) 
+        user.staff = True
+        user.save(using=self._db)    
+        return user
+
+    def create_superuser(self, email, full_name=None, password=None):
+        """
+        Creates and saves a superuser with the given email and password.
+        """
+        user = self.create_user(
+            email,
+            full_name = full_name,
+            password = password
+        ) 
+        user.staff = True
+        user.admin = True
+        user.save(using=self._db)
         return user
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    email           = models.EmailField(max_length=255, unique=True) 
+    email           = models.EmailField(max_length=255, unique=True)
+    full_name       = models.CharField(max_length=255, blank=True, null=True) 
     active          = models.BooleanField(default=True)
     staff           = models.BooleanField(default=False) # staff user non super
     admin           = models.BooleanField(default=False) 
     timestamp       = models.DateTimeField(auto_now_add=True)
 
     USERNAME_FIELD = 'email' #username
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = [] # Add other required fields
 
     objects = UserManager()
 
     def get_full_name(self):
+        if self.full_name:
+            return self.full_name
         return self.email
 
     def get_short_name(self):
@@ -61,13 +80,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     # "Does the user have a specific permission?"
     def has_perm(self, perm, obj=None):
-        "Does the user have a specific permission?"
         # Simplest possible answer: Yes, always
         return True
 
     # "Does the user have permissions to view the app 'app_label'?"
     def has_module_perms(self, app_label):
-        "Does the user have permissions to view the app `app_label`?"
         # Simplest possible answer: Yes, always
         return True
 
@@ -85,8 +102,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_active(self):
         return self.active
-
-
 
 
 class GuestEmail(models.Model):
